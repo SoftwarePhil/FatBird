@@ -1,6 +1,5 @@
 defmodule RentMe.Couch.Base do
     alias FatBird.Couch.Db, as: Db
-    alias FatBird.Couch.Util, as: Util
 
     @moduledoc """
         This module acts as a store for all databases used in an application
@@ -9,27 +8,36 @@ defmodule RentMe.Couch.Base do
      """
 
     #call this function on first start up
-    def init_(app_name) do
-        {:ok, db} = app_db(app_name)
-
-        Db.write_document(db, "app", Poison.encode!(%{"dbs"=>[]}))
+    def init_() do
+        db = app_db() 
+        |> Db.write_document("app", Poison.encode!(%{"dbs"=>[]}))
+        
         {:ok, db}
     end
 
-    def app_db(app_name) do
-        Db.db_config(app_name)
+    def app_name() do
+        Application.get_env(:fat_bird, :app_name)
     end
 
-    def get_all_dbs(app_name) do
-        with {:ok, dbs} <- Db.get_document(app_db(app_name), "app", "failed to get load #{app_name} databases document") do
-            dbs = rent_me["dbs"]
+    #use a macro to generate a function the returns the apps name??
+    #store it in a ets table?
+    #where does it come from to on start with 
+    def app_db() do
+        app_name()
+        |>Db.db_config()
+    end
+
+    def get_all_dbs() do
+        with {:ok, doc} <- Db.get_document(app_db(), "app", "failed to get load databases document") do
+           {:ok, doc["dbs"]}
         else
              _ -> {:error, "could not load databases"}
         end
     end
 
-    def add_database(app_name, db) do
-        app_db(app_name)
+    #should this create a new database? prolly
+    def add_database(db) do
+        app_db()
         |>Db.append_to_document("app", "dbs", db, "failed to add new database")
     end
 end

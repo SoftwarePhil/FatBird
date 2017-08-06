@@ -17,7 +17,7 @@ defmodule FatBird.Couch.Db do
     end
 
     def db_config(name) do
-        %{@couch_config | database: __MODULE__<>name}
+        %{@couch_config | database: "#{__MODULE__}_#{name}"}
     end
     
     @doc"""

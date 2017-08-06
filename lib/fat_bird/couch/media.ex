@@ -1,5 +1,5 @@
-defmodule RentMe.Couch.Media do
-    alias RentMe.Couch.Db, as: Db
+defmodule FatBrid.Couch.Media do
+    alias FatBird.Couch.Db, as: Db
     
     defp save_media(db, type, item) do
         id = type<>rand()
