@@ -5,13 +5,6 @@ defmodule RentMe.Couch.Util do
             false -> {:error, "missing"}
         end
     end
-
-    def equals(a, b) do
-      case {a, b} do
-           {a, b} when a == b -> true
-            _ -> false
-      end
-    end
     
     def add_to_list(list, item) do
         case list do
