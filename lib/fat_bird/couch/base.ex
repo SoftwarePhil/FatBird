@@ -10,7 +10,7 @@ defmodule RentMe.Couch.Base do
     #call this function on first start up
     def init_() do
         db = app_db() 
-        |> Db.write_document("app", Poison.encode!(%{"dbs"=>[]}))
+        |> Db.write_document("app", Poison.encode!(%{"list"=>[]}))
         
         {:ok, db}
     end
@@ -27,17 +27,22 @@ defmodule RentMe.Couch.Base do
         |>Db.db_config()
     end
 
-    def get_all_dbs() do
-        with {:ok, doc} <- Db.get_document(app_db(), "app", "failed to get load databases document") do
+    def get_db(type) do
+        with {:ok, doc} <- Db.get_document(app_db(), type, "failed to get load type database") do
            {:ok, doc["dbs"]}
         else
              _ -> {:error, "could not load databases"}
         end
     end
 
-    #should this create a new database? prolly
-    def add_database(db) do
+    #we need many types of different databases
+    def add_database(db, type) do
         app_db()
-        |>Db.append_to_document("app", "dbs", db, "failed to add new database")
+        |>Db.append_to_document(type, "list", db, "failed to add new database")
+    end
+
+    def add_type(type) do
+        app_db()
+        |>Db.new_document(type, Poison.encode!(%{"list"=>[]}))
     end
 end
