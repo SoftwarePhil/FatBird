@@ -79,4 +79,3 @@ defmodule FatBird.Store.Store do
                     end)
     end
 end
-end

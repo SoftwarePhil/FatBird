@@ -27,9 +27,9 @@ defmodule RentMe.Couch.Base do
         |>Db.db_config()
     end
 
-    def get_db(type) do
+    def get_dbs(type) do
         with {:ok, doc} <- Db.get_document(app_db(), type, "failed to get load type database") do
-           {:ok, doc["dbs"]}
+           {:ok, doc["list"]}
         else
              _ -> {:error, "could not load databases"}
         end
