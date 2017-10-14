@@ -3,8 +3,8 @@ defmodule FatBird.Store.Server do
     use GenServer
     alias FatBird.Couch.Db, as: Db
     alias FatBird.Couch.Base, as: Base
-    alias FatBird.Items.Store, as: ItemStore
-    alias RentMe.Locations.Supervisor, as: Super
+    alias FatBird.Items.Store, as: Store
+    alias FatBird.Store.Supervisor, as: Super
 
     #adding an item 
     #task to write to db
@@ -12,12 +12,11 @@ defmodule FatBird.Store.Server do
 
     # on restart/crash don't try to remake database, load items into server and items into ets table OR load from ets table
     # 
-    def start_link(city) do
-        with {:ok, db_config} <- init_db(city),
-             {:ok, _db_config} <- Base.add_location(city, db_config),
-             item_ets when item_ets != false <- ItemStore.create_ets(city),
-             rental_ets when rental_ets != false <- RentalStore.create_ets(city),
-             {:ok, pid} <- GenServer.start_link(__MODULE__, %{name: city, database: db_config, items: item_ets, rentals: rental_ets}, name: server_name(city)) do 
+    def start_link(type, id) do
+        with {:ok, db_config} <- init_db(type),
+             {:ok, _db_config} <- Base.add_location(type, db_config),
+             ets_id when ets_id != false <- Store.create_ets(type),
+             {:ok, pid} <- GenServer.start_link(__MODULE__, %{name: type, database: db_config, store: ets_id}, name: server_name(type, id)) do 
                 {:ok, pid}
         else    
                 {:error, msg} -> 
@@ -27,16 +26,14 @@ defmodule FatBird.Store.Server do
     end
 
     #what if ets table exists already, it should not be remade
-    def start_link(:reload, {city, db_config}) do
-        IO.inspect({city, db_config})
+    def start_link(:reload, {type, id, db_config}) do
         #what if ets table still exists (the ets table does not crash with this process)
-        case Super.get_ets_table_ids(city) do
-            {:ok, {items, rentals}} ->
-                 GenServer.start_link(__MODULE__, %{name: city, database: db_config, items: items, rentals: rentals}, name: server_name(city))
+        case Super.get_ets_table_ids(type, id) do
+            {:ok, ets_id} ->
+                 GenServer.start_link(__MODULE__, %{name: type, database: db_config, store: ets_id}, name: server_name(type, id))
             {:error, _} ->
-                with item_ets when item_ets != false <- ItemStore.remake_ets(city, db_config),
-                   rental_ets when rental_ets != false <- RentalStore.remake_ets(city, db_config),
-                   {:ok, pid} <- GenServer.start_link(__MODULE__, %{name: city, database: db_config, items: item_ets, rentals: rental_ets}, name: server_name(city)) do 
+                with ets_id when ets_id != false <- Store.create_ets(type),
+                   {:ok, pid} <- GenServer.start_link(__MODULE__, %{name: type, database: db_config, store: ets_id}, name: server_name(type, id)) do 
                         {:ok, pid}
                 else    
                   {:error, _msg} -> 
@@ -44,7 +41,7 @@ defmodule FatBird.Store.Server do
             end 
         end
     end
-    def start_link(:reload, city), do: start_link(:reload, {city, Base.get_location_db(city)})
+    def start_link(:reload, type, id, db_config), do: start_link(:reload, {type, id, db_config})
 
     def handle_call(:state, _from, state) do
         {:reply, state, state}
@@ -82,10 +79,10 @@ defmodule FatBird.Store.Server do
     end
     
 
-    def state(name) do
-        GenServer.call(server_name(name), :state)
+    def state(type, id) do
+        GenServer.call(server_name(type, id), :state)
     end
-
+"""
     def add_item(name, email, location, price, tags, description, picture) do
         #valid item??
         #use ecto to validate
@@ -96,22 +93,22 @@ defmodule FatBird.Store.Server do
         Task.start(User, :add_item, [user, %{id: id, name: item.name}])
         {:ok, id}
     end
-
-    def add_rental(item=%Item{}, user, rental_length) do
-        rental = Rental.new_rental(user, item, rental_length)
-        GenServer.call(server_name(item.city), {:new_rental, rental})
+"""
+    def add_rental(type, id) do
+        #rental = Store.new_rental(user, item, rental_length)
+        #GenServer.call(server_name(type, id), {:new_rental, rental})
     end
 
-    def search_items(city, term) do
-        GenServer.call(server_name(city), {:search_items, term})
+    def search_items(type, id, term) do
+        GenServer.call(server_name(type, id), {:search_items, term})
     end
 
-    def get_item(city, id) do
-        GenServer.call(server_name(city), {:get_item, id})
+    def get_item(type, id) do
+        GenServer.call(server_name(type, id), {:get_item, id})
     end
 
-    def test_crash(city) do
-        GenServer.call(server_name(city), :crash)
+    def test_crash(type, id) do
+        GenServer.call(server_name(type, id), :crash)
     end
 
     defp init_db(location) do
@@ -145,7 +142,7 @@ defmodule FatBird.Store.Server do
         end
     end
 
-    defp server_name(location) do
-        {:global, location}
+    defp server_name(type, id) do
+        {:global, "#{type}-#{id}"}
     end
 end

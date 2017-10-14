@@ -2,7 +2,7 @@ defmodule FatBird.Store.Supervisor do
     use Supervisor
     import Supervisor.Spec
     
-    alias FatBird.Locations.Server, as: Server
+    alias FatBird.Store.Server, as: Server
     alias FatBird.Couch.Base, as:  Base
 
     #TODO:: save ets tables in another ets so on restart we don't remake tables??
@@ -24,25 +24,24 @@ defmodule FatBird.Store.Supervisor do
         supervise(children, strategy: :simple_one_for_one)
     end
 
-    def add_location({:reload, type, id}) do
+    def add_type({:reload, type, id}) do
         res = Supervisor.start_child(__MODULE__, [:reload, type, id])
-        save_table_ids(city)
+        save_table_ids(type, id)
         res
     end
 
     #this might not be module, the supervisor is actually the type as an atom
     def add_type(type, id, ets_id) do
+        ets_id = save_table_ids(type, id)
         res = Supervisor.start_child(__MODULE__, [type, id, ets_id])
-        save_table_ids(city)
         res
     end
 
     def reload_all_types(type) do
         Base.type_dbs(type)
-        |>Enum.map(fn(city_db) -> 
-            res = Supervisor.start_child(__MODULE__, [:reload, type, ets_id]) 
-            save_table_ids(city)
-            res
+        |>Enum.map(fn({type, id}) -> 
+            ets_id = save_table_ids(type, id)
+            Supervisor.start_child(__MODULE__, [:reload, type, ets_id]) 
         end)
     end
 
@@ -53,6 +52,7 @@ defmodule FatBird.Store.Supervisor do
     def save_table_ids(type, id) do
         %{:ets=>ets} = Server.state({type, id})
         :ets.insert(String.to_atom(type), {id, ets})
+        ets
     end
 
     @doc"""

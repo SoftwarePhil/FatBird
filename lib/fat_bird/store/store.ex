@@ -1,7 +1,7 @@
 defmodule FatBird.Store.Store do
 
-    def create_ets(_location) do
-        id = :ets.new(:location, [:set, :public])
+    def create_ets(type) do
+        id = :ets.new(type, [:set, :public])
         id
     end
 
@@ -68,6 +68,8 @@ defmodule FatBird.Store.Store do
     end
     def search_match?(term, name), do: String.downcase(name) |>String.match?(Regex.compile!("#{term}"))
 
+    
+    ##make reload happen with views
     def reload_items(database) do
         {:ok, res} = Db.get_document(database, "items", "failed to get item list")
 

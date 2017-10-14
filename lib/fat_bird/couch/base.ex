@@ -1,4 +1,4 @@
-defmodule RentMe.Couch.Base do
+defmodule FatBird.Couch.Base do
     alias FatBird.Couch.Db, as: Db
 
     @moduledoc """
@@ -43,6 +43,6 @@ defmodule RentMe.Couch.Base do
 
     def add_type(type) do
         app_db()
-        |>Db.new_document(type, Poison.encode!(%{"list"=>[]}))
+        |>Db.write_document(type, Poison.encode!(%{"list"=>[]}))
     end
 end
