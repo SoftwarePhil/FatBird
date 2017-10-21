@@ -1,15 +1,16 @@
 defmodule FatBird.Store.Store do
+    alias FatBird.Couch.Db, as: Couch
 
     def create_ets(type) do
         id = :ets.new(type, [:set, :public])
         id
     end
 
-    def remake_ets(location, database) do
+    def remake_ets(type, database) do
         id = :ets.new(:location, [:set, :public])
   
         reload_items(database)
-        |>Enum.each(fn(item) -> add_item({id, location}, Item.to_struct(item), :ets) end)
+        |>Enum.each(fn(item) -> add_item(type, item, :ets) end)
         id
     end
 
@@ -36,9 +37,8 @@ defmodule FatBird.Store.Store do
        
         case :ets.insert(ets, item) do
             true ->
-                id = elem(item, 0)
-                Task.start(Db, :write_document, [database, id, Poison.encode!(item)])
-                Task.start(Db, :append_to_document, [database, "items", "list", id, "failed to presist item in database"]) 
+                id = Couch.create_id()
+                Task.start(Couch, :write_document, [database, id, Poison.encode!(item)])
                 {:ok, id}
             _ -> {:error, "failed to add item"}
         end
@@ -57,26 +57,21 @@ defmodule FatBird.Store.Store do
     #{id, name, user, item_struct.active, item_struct.tags, item_struct.description, item_struct.price, item_struct.location}
     #this is bad, should use :ets.select, docs explicitly say not to do this
     #how to make this more generic??
+   #not sure how to seach 
     def search_items(ets, term) do
-        :ets.tab2list(ets) |> Enum.filter(
-            fn({_, item, _, _, _, _, _, _})-> 
-               search_match?(term, item)
-            end) 
-            |> Enum.map(fn({id, name, user, active, tags, des, price, location}) -> 
-                %{id: id, user: user,name: name, active: active, tags: tags, description: des, price: price, location: location}
-            end)
+        #best way to seach items??
+        IO.inspect({ets, term})
     end
-    def search_match?(term, name), do: String.downcase(name) |>String.match?(Regex.compile!("#{term}"))
 
     
     ##make reload happen with views
     def reload_items(database) do
-        {:ok, res} = Db.get_document(database, "items", "failed to get item list")
+        {:ok, res} = Couch.get_document(database, "items", "failed to get item list")
 
         res
         |>(fn(result) -> result["list"] end).()
         |>Enum.map(fn(item) -> 
-                        {:ok, fetch} = Db.get_document(database, item, "item-not-found") 
+                        {:ok, fetch} = Couch.get_document(database, item, "item-not-found") 
                         fetch
                     end)
     end

@@ -3,7 +3,7 @@ defmodule FatBird.Store.Server do
     use GenServer
     alias FatBird.Couch.Db, as: Db
     alias FatBird.Couch.Base, as: Base
-    alias FatBird.Items.Store, as: Store
+    alias FatBird.Store.Store, as: Store
     alias FatBird.Store.Supervisor, as: Super
 
     #adding an item 
@@ -12,11 +12,10 @@ defmodule FatBird.Store.Server do
 
     # on restart/crash don't try to remake database, load items into server and items into ets table OR load from ets table
     # 
-    def start_link(type, id) do
+    def start_link(type) do
         with {:ok, db_config} <- init_db(type),
-             {:ok, _db_config} <- Base.add_location(type, db_config),
              ets_id when ets_id != false <- Store.create_ets(type),
-             {:ok, pid} <- GenServer.start_link(__MODULE__, %{name: type, database: db_config, store: ets_id}, name: server_name(type, id)) do 
+             {:ok, pid} <- GenServer.start_link(__MODULE__, %{name: type, database: db_config, store: ets_id}, name: server_name(type)) do 
                 {:ok, pid}
         else    
                 {:error, msg} -> 
@@ -26,14 +25,14 @@ defmodule FatBird.Store.Server do
     end
 
     #what if ets table exists already, it should not be remade
-    def start_link(:reload, {type, id, db_config}) do
+    def start_link(:reload, type, db_config) do
         #what if ets table still exists (the ets table does not crash with this process)
-        case Super.get_ets_table_ids(type, id) do
+        case Super.get_ets_table_ids(type) do
             {:ok, ets_id} ->
-                 GenServer.start_link(__MODULE__, %{name: type, database: db_config, store: ets_id}, name: server_name(type, id))
+                 GenServer.start_link(__MODULE__, %{name: type, database: db_config, store: ets_id}, name: server_name(type))
             {:error, _} ->
                 with ets_id when ets_id != false <- Store.create_ets(type),
-                   {:ok, pid} <- GenServer.start_link(__MODULE__, %{name: type, database: db_config, store: ets_id}, name: server_name(type, id)) do 
+                   {:ok, pid} <- GenServer.start_link(__MODULE__, %{name: type, database: db_config, store: ets_id}, name: server_name(type)) do 
                         {:ok, pid}
                 else    
                   {:error, _msg} -> 
@@ -41,13 +40,12 @@ defmodule FatBird.Store.Server do
             end 
         end
     end
-    def start_link(:reload, type, id, db_config), do: start_link(:reload, {type, id, db_config})
 
     def handle_call(:state, _from, state) do
         {:reply, state, state}
     end
 
-    def handle_call({:new_item, item}, _from, state) do
+    def handle_call({:new_item, _item}, _from, state) do
         #get ets,
         #call add item?
         #failure?
@@ -55,94 +53,54 @@ defmodule FatBird.Store.Server do
         #reply with created item
 
         #the ets knows the city no need to pass it in again??
-        {:ok, id} = ItemStore.add_item({state.items, state.name}, item, state.database)
 
-        {:reply, {:ok, id}, state}
+        {:reply, :ok, state}
     end
 
-    def handle_call({:new_rental, rental}, _from, state) do
-        {:ok, id} = RentalStore.add_item(state.rentals, rental, state.database)
-
-        {:reply, {:ok, id}, state}
-    end
 
     def handle_call({:search_items, term}, _from, state) do
         %{items: items} = state
-        list = ItemStore.search_items(items, term)
+        list = Store.search_items(items, term)
         {:reply, {:ok, list}, state}
     end
 
     def handle_call({:get_item, id}, _from, state) do
-        %{items: items} = state
-        {:ok, item} = ItemStore.get_item(items, id)
+        %{store: store} = state
+        {:ok, item} = Store.get_item(store, id)
         {:reply, {:ok, item}, state}
     end
     
 
-    def state(type, id) do
-        GenServer.call(server_name(type, id), :state)
+    def state(type) do
+        GenServer.call(server_name(type), :state)
     end
-"""
-    def add_item(name, email, location, price, tags, description, picture) do
+
+    def add_item(type, item) do
         #valid item??
         #use ecto to validate
         #figiure out how to save pictures ... thumbnails? seperate documents? just the id?
-        user = User.get_user(email)
-        item = Item.new_item(name, email, user.city, location, price, tags, description, picture)
-        {:ok, id} = GenServer.call(server_name(user.city), {:new_item, item})
-        Task.start(User, :add_item, [user, %{id: id, name: item.name}])
-        {:ok, id}
-    end
-"""
-    def add_rental(type, id) do
-        #rental = Store.new_rental(user, item, rental_length)
-        #GenServer.call(server_name(type, id), {:new_rental, rental})
+        Task.start(Store, :add_item, [type, item])
+        {:ok, item}
     end
 
-    def search_items(type, id, term) do
-        GenServer.call(server_name(type, id), {:search_items, term})
+    def search_items(type, term) do
+        GenServer.call(server_name(type), {:search_items, term})
     end
 
     def get_item(type, id) do
-        GenServer.call(server_name(type, id), {:get_item, id})
+        GenServer.call(server_name(type), {:get_item, id})
     end
 
-    def test_crash(type, id) do
-        GenServer.call(server_name(type, id), :crash)
+    def test_crash(type) do
+        GenServer.call(server_name(type), :crash)
     end
 
-    defp init_db(location) do
-        location
-        |>create_id()
-        |>Db.init_db()
-        |>set_up_city_doc()
+    defp init_db(type) do
+        type
+        |>Base.add_database(type)
     end
 
-    defp create_id(location) do
-        location
-        |>String.downcase
-        |>String.replace(", ", "_")
-        |>String.replace(" ", "$")
-    end
-
-    def id_to_name(db_config) do
-        db_config
-        |>String.split("_")
-        |>List.first
-        |>String.replace("$", " ")
-    end
-
-    defp set_up_city_doc({:error, msg}), do: {:error, msg}
-    defp set_up_city_doc({:ok, db}) do
-        with {:ok, _msg} <- Db.write_document(db, "items", Poison.encode!(%{"list"=>[]})),
-        {:ok, _msg} <- Db.write_document(db, "rentals", Poison.encode!(%{"list"=>[]})) do
-            {:ok, db}
-        else
-            {:error, msg} -> {:error, msg}
-        end
-    end
-
-    defp server_name(type, id) do
-        {:global, "#{type}-#{id}"}
+    defp server_name(type) do
+        {:global, type}
     end
 end

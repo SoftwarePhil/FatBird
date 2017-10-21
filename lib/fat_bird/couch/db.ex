@@ -99,12 +99,12 @@ defmodule FatBird.Couch.Db do
      
     end
 
-    def view_template(view_name, field) do
+    def view_template(design_name, view_name, field) do
         """
         {
-            "_id" : "_design/#{view_name}",
+            "_id" : "_design/#{design_name}",
             "views" : {
-                "by_name" : {
+                "#{view_name}": {
                     "map" : "function(doc){ emit(doc.#{field}, doc)}"
                 }
             }
@@ -117,7 +117,7 @@ defmodule FatBird.Couch.Db do
        creates a view that pulls in all docs with a certain key in them
     """
     def create_view(db, design_name, view_name, field) do
-        {:ok, _} = Couchdb.Connector.View.create_view(db, design_name, view_template(view_name, field))
+        {:ok, _} = Couchdb.Connector.View.create_view(db, design_name, view_template(design_name, view_name, field))
     end
 
     def delete_document(db, key, error) do
@@ -127,5 +127,9 @@ defmodule FatBird.Couch.Db do
                     {:ok, "document deleted"}
             _ -> {:error, error}
             end
+    end
+
+    def create_id do
+        :rand.uniform(15)
     end
 end
