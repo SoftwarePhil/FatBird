@@ -3,31 +3,26 @@ defmodule FatBird.Store.Supervisor do
     import Supervisor.Spec
     
     alias FatBird.Store.Server, as: Server
-    alias FatBird.Couch.Base, as:  Base
 
     #TODO:: save ets tables in another ets so on restart we don't remake tables??
     
     @doc"""
         one supervisor per type
     """
-    def start_link(type) do 
-        Supervisor.start_link(__MODULE__, [], name: String.to_atom(type))
+    def start_link(type_data) do 
+        Supervisor.start_link(__MODULE__, [type_data.type], name: String.to_atom(type_data.type))
+
+        #start each subtype
     end
 
     ##which type of server will get made, how do we figure that out??
-    def init(type) do
+    def init([type]) do
         :ets.new(String.to_atom(type), [:named_table, :public])
         children = [
             worker(Server, [], restart: :permanent)
         ]
 
         supervise(children, strategy: :simple_one_for_one)
-    end
-
-    def add_type({:reload, type}) do
-        res = Supervisor.start_child(__MODULE__, [:reload, type])
-        save_table_ids(type)
-        res
     end
 
     #this might not be module, the supervisor is actually the type as an atom
@@ -37,8 +32,8 @@ defmodule FatBird.Store.Supervisor do
         res
     end
 
-    def reload_all_types(type) do
-        Base.get_dbs(type)
+    def reload_all_types(type_data) do
+        type_data.list
         |>Enum.map(fn(type) -> 
             ets_id = save_table_ids(type)
             Supervisor.start_child(__MODULE__, [:reload, type, ets_id]) 

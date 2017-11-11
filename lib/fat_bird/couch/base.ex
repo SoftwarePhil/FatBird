@@ -9,10 +9,9 @@ defmodule FatBird.Couch.Base do
 
     #call this function on first start up
     def init_() do
-        db = app_db() 
-        |> Db.write_document("app", Poison.encode!(%{"list"=>[]}))
+        {:ok, db} = Db.init_db(app_name())
         
-        {:ok, db}
+        Db.write_document(db, "app", Poison.encode!(%{"list"=>[]}))
     end
 
     def app_name() do
@@ -27,8 +26,8 @@ defmodule FatBird.Couch.Base do
         |>Db.db_config()
     end
 
-    def get_dbs(type) do
-        with {:ok, doc} <- Db.get_document(app_db(), type, "failed to get load type database") do
+    def get_dbs() do
+        with {:ok, doc} <- Db.get_document(app_db(), "app", "failed to get load type database") do
            {:ok, doc["list"]}
         else
              _ -> {:error, "could not load databases"}
@@ -36,13 +35,12 @@ defmodule FatBird.Couch.Base do
     end
 
     #we need many types of different databases
-    def add_database(db, type) do
-        app_db()
-        |>Db.append_to_document(type, "list", db, "failed to add new database")
-    end
-
-    def add_type(type) do
-        app_db()
-        |>Db.write_document(type, Poison.encode!(%{"list"=>[]}))
+    def add_database(type) do
+        with {:ok, db} <- Db.init_db(type) do
+            app_db()
+            |>Db.append_to_document(type, "list", db, "failed to add new database")
+        else
+            _ -> {:error, "could not add db"}
+        end
     end
 end

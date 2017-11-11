@@ -1,7 +1,7 @@
 
 defmodule FatBird.Store.Server do
     use GenServer
-    alias FatBird.Couch.Db, as: Db
+    #alias FatBird.Couch.Db, as: Db
     alias FatBird.Couch.Base, as: Base
     alias FatBird.Store.Store, as: Store
     alias FatBird.Store.Supervisor, as: Super
@@ -96,8 +96,7 @@ defmodule FatBird.Store.Server do
     end
 
     defp init_db(type) do
-        type
-        |>Base.add_database(type)
+       Base.add_database(type)
     end
 
     defp server_name(type) do

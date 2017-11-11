@@ -14,6 +14,7 @@ defmodule FatBird.Mixfile do
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
+      mod: {FatBird, []},
       extra_applications: [:logger, :couchdb_connector]
     ]
   end

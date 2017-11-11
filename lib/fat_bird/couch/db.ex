@@ -17,7 +17,10 @@ defmodule FatBird.Couch.Db do
     end
 
     def db_config(name) do
-        %{@couch_config | database: "#{__MODULE__}_#{name}"}
+        db_name = String.replace("#{name}_#{__MODULE__}", ".", "_")
+        |>String.downcase
+
+        %{@couch_config | database: db_name}
     end
     
     @doc"""
@@ -105,7 +108,9 @@ defmodule FatBird.Couch.Db do
             "_id" : "_design/#{design_name}",
             "views" : {
                 "#{view_name}": {
-                    "map" : "function(doc){ emit(doc.#{field}, doc)}"
+                   if(doc.type == '#{field}'){
+                        "map" : "function(doc){ emit(doc._id, doc)}"
+                    }
                 }
             }
         }
